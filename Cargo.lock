@@ -3,5 +3,22 @@
 version = 3
 
 [[package]]
+name = "company_data_store"
+version = "0.0.0"
+
+[[package]]
+name = "company_scraper"
+version = "0.0.0"
+
+[[package]]
+name = "job_applier"
+version = "0.0.0"
+
+[[package]]
 name = "search_and_apply"
-version = "0.1.0"
+version = "0.0.0"
+dependencies = [
+ "company_data_store",
+ "company_scraper",
+ "job_applier",
+]

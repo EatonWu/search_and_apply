@@ -1,6 +1,14 @@
+[workspace]
+members = [
+    "company_data_store",
+    "company_scraper",
+    "job_applier",
+]
+
 [package]
 name = "search_and_apply"
-version = "0.1.0"
-edition = "2021"
 
 [dependencies]
+company_data_store = { path = "company_data_store" }
+company_scraper = { path = "company_scraper" }
+job_applier = { path = "job_applier" }
