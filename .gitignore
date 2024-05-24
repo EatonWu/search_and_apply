@@ -1,1 +1,6 @@
 /target
+/.idea/.gitignore
+/.idea/modules.xml
+/.idea/inspectionProfiles/Project_Default.xml
+/.idea/search_and_apply.iml
+/.idea/vcs.xml
