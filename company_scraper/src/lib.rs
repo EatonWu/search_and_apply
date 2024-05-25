@@ -7,13 +7,21 @@ use chrono::{Datelike, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json;
 
-#[derive(Debug, Serialize, Deserialize)]
-struct Company {
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Company {
     name: String,
     cik: String,
     form_numbers: String,
     date: String,
     file_name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ProcessedCompany {
+    cik: String,
+    company_name: String,
+    website: Option<String>,
+    // ticker: Option<String> // probably not necessary
 }
 
 
@@ -49,7 +57,7 @@ pub fn get_idx_file_date() -> Result<chrono::NaiveDate, Box<dyn std::error::Erro
     };
 }
 
-pub fn get_companies_from_idx() -> Result<(), Box<dyn std::error::Error>> {
+pub fn get_companies_from_idx() -> Result<Vec<Company>, Box<dyn std::error::Error>> {
     let file = std::fs::File::open("@data/company.idx")?;
     let reader = std::io::BufReader::new(file);
     let mut lines = reader.lines();
@@ -57,6 +65,7 @@ pub fn get_companies_from_idx() -> Result<(), Box<dyn std::error::Error>> {
     for _ in 0..10 {
         lines.next();
     }
+    let mut all_companies = vec![];
 
     // parse out the company names and the CIK numbers, which we'll use as hash keys.
     for line in lines {
@@ -75,13 +84,39 @@ pub fn get_companies_from_idx() -> Result<(), Box<dyn std::error::Error>> {
             date: date.to_string(),
             file_name: file_name.to_string(),
         };
-        dbg!(company);
+        // dbg!(company);
+        all_companies.push(company);
+    }
+    Ok(all_companies)
+}
+
+pub fn separate_and_save_companies(companies: Vec<Company>, partitions: usize)
+                                                        -> Result<(), Box<dyn std::error::Error>> {
+    let partition_size = companies.len() / partitions;
+    for i in 0..partitions {
+        let start = i * partition_size;
+        let end = if i == partitions - 1 {
+            companies.len()
+        } else {
+            (i + 1) * partition_size
+        };
+        let partition = &companies[start..end];
+        let filename = format!("@data/companies_{}.json", i);
+        save_companies_to_json(partition.to_vec(), &filename)?;
     }
     Ok(())
 }
 
+pub fn save_companies_to_json(companies: Vec<Company>, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+    // save companies pretty printed
+    let json = serde_json::to_string_pretty(&companies)?;
+    let mut file = std::fs::File::create(filename)?;
+    file.write_all(json.as_bytes())?;
+    Ok(())
+}
+
 // This function downloads the master list of companies from the SEC
-pub async fn get_companies_from_sec() -> Result<(), Box<dyn std::error::Error>>{
+pub async fn get_company_idx_file_from_sec() -> Result<(), Box<dyn std::error::Error>>{
 
     // check if file already exists and is up to date
     if std::path::Path::new("@data/company.idx").exists() {
