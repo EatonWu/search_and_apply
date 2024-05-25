@@ -7,6 +7,7 @@ members = [
 
 [package]
 name = "search_and_apply"
+edition = "2021"
 
 [dependencies]
 company_data_store = { path = "company_data_store" }
