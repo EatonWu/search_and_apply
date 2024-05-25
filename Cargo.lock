@@ -125,6 +125,8 @@ version = "0.0.0"
 dependencies = [
  "chrono",
  "reqwest",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 

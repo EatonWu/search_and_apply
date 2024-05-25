@@ -3,8 +3,19 @@
 use std::io::{BufRead, Write};
 use reqwest::header;
 use chrono;
-use chrono::format::{Item, Parsed};
-use chrono::{Datelike, FixedOffset, Utc};
+use chrono::{Datelike, Utc};
+use serde::{Deserialize, Serialize};
+use serde_json;
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Company {
+    name: String,
+    cik: String,
+    form_numbers: String,
+    date: String,
+    file_name: String,
+}
+
 
 /// This function gets the date of the company.idx file
 /// The relevant part of the header for this file is 2lines long, and contains:
@@ -36,7 +47,37 @@ pub fn get_idx_file_date() -> Result<chrono::NaiveDate, Box<dyn std::error::Erro
             Err(Box::new(e))
         }
     };
+}
 
+pub fn get_companies_from_idx() -> Result<(), Box<dyn std::error::Error>> {
+    let file = std::fs::File::open("@data/company.idx")?;
+    let reader = std::io::BufReader::new(file);
+    let mut lines = reader.lines();
+    // ignore first 10 lines
+    for _ in 0..10 {
+        lines.next();
+    }
+
+    // parse out the company names and the CIK numbers, which we'll use as hash keys.
+    for line in lines {
+        let line = line?;
+        // company names are at most 60 characters long, but the first column seems to be 63 characters long
+        let company_name = &line[0..62].trim();
+        let form_numbers = &line[62..74].trim();
+        let cik = &line[74..86].trim();
+        let date = &line[86..98].trim();
+        let file_name = &line[98..].trim();
+
+        let company = Company {
+            name: company_name.to_string(),
+            cik: cik.to_string(),
+            form_numbers: form_numbers.to_string(),
+            date: date.to_string(),
+            file_name: file_name.to_string(),
+        };
+        dbg!(company);
+    }
+    Ok(())
 }
 
 // This function downloads the master list of companies from the SEC
@@ -62,6 +103,7 @@ pub async fn get_companies_from_sec() -> Result<(), Box<dyn std::error::Error>>{
         std::fs::create_dir("@data")?;
     }
 
+    // TODO: Might need to find a way to automate finding the latest company.idx file
     let link = "https://www.sec.gov/Archives/edgar/full-index/2024/QTR2/company.idx";
     let mut request = header::HeaderMap::new();
 
