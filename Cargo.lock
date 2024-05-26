@@ -127,6 +127,7 @@ name = "company_data_store"
 version = "0.0.0"
 dependencies = [
  "company_common",
+ "serde",
  "serde_json",
 ]
 

@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -12,7 +13,7 @@ pub struct Company {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ProcessedCompany {
     pub cik: usize,
-    pub company_aliases: Vec<String>,
+    pub company_aliases: HashSet<String>,
     website: Option<String>,
     career_page: Option<String>
     // ticker: Option<String> // probably not necessary
@@ -32,7 +33,7 @@ impl Company {
 }
 
 impl ProcessedCompany {
-    pub fn new(cik: usize, company_aliases: Vec<String>, website: Option<String>, career_page: Option<String>) -> ProcessedCompany {
+    pub fn new(cik: usize, company_aliases: HashSet<String>, website: Option<String>, career_page: Option<String>) -> ProcessedCompany {
         ProcessedCompany {
             cik,
             company_aliases,

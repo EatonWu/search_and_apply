@@ -1,6 +1,6 @@
 // A good start would probably be just to iterate over all the companies
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, Write};
 use reqwest::header;
 use chrono;
@@ -76,8 +76,6 @@ pub fn get_companies_from_idx() -> Result<Vec<Company>, Box<dyn std::error::Erro
     Ok(all_companies)
 }
 
-
-
 pub fn process_raw_data(companies: Vec<Company>) -> CompanyDataStore {
     let mut data_store = CompanyDataStore::new();
     for company in companies {
@@ -85,19 +83,17 @@ pub fn process_raw_data(companies: Vec<Company>) -> CompanyDataStore {
             data_store.add_alias(company.cik, company.name);
             continue;
         }
-
-        let processed_company = ProcessedCompany::new(
+        let mut processed_company = ProcessedCompany::new(
             company.cik,
-            vec![company.name],
+            HashSet::new(),
             None,
             None,
         );
+        processed_company.company_aliases.insert(company.name);
         data_store.add_company(processed_company);
     }
     data_store
 }
-
-
 
 // This function downloads the master list of companies from the SEC
 pub async fn get_company_idx_file_from_sec() -> Result<(), Box<dyn std::error::Error>>{
