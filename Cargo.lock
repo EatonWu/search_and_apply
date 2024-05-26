@@ -116,14 +116,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "company_common"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "company_data_store"
 version = "0.0.0"
+dependencies = [
+ "company_common",
+]
 
 [[package]]
 name = "company_scraper"
 version = "0.0.0"
 dependencies = [
  "chrono",
+ "company_data_store",
  "reqwest",
  "serde",
  "serde_json",

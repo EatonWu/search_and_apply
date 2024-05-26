@@ -8,7 +8,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
     println!("Number of companies: {}", companies.len());
     // save companies to pages, there are approximately 200000 entries
     // 200000 / 20 = 10000 entries per file
-    company_scraper::separate_and_save_companies(companies, 20)?;
+    company_scraper::separate_and_save_companies(companies, 20, "@unprocessed_data")?;
 
     // for company in companies {
     //     println!("{:?}", company);

@@ -2,3 +2,4 @@
 name = "company_data_store"
 
 [dependencies]
+company_common = { path = "../company_common" }
