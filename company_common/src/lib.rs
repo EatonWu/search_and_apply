@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Company {
-    name: String,
-    cik: usize,
+    pub name: String,
+    pub cik: usize,
     form_numbers: String,
     date: String,
     file_name: String,
@@ -12,8 +12,32 @@ pub struct Company {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ProcessedCompany {
     cik: usize,
-    company_aliases: Vec<String>,
+    pub company_aliases: Vec<String>,
     website: Option<String>,
     career_page: Option<String>
     // ticker: Option<String> // probably not necessary
+}
+
+impl Company {
+    pub fn new(name: String, cik: usize, form_numbers: String, date: String, file_name: String) -> Company {
+        Company {
+            name,
+            cik,
+            form_numbers,
+            date,
+            file_name
+        }
+    }
+
+}
+
+impl ProcessedCompany {
+    pub fn new(cik: usize, company_aliases: Vec<String>, website: Option<String>, career_page: Option<String>) -> ProcessedCompany {
+        ProcessedCompany {
+            cik,
+            company_aliases,
+            website,
+            career_page
+        }
+    }
 }

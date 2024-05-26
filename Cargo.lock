@@ -134,6 +134,7 @@ name = "company_scraper"
 version = "0.0.0"
 dependencies = [
  "chrono",
+ "company_common",
  "company_data_store",
  "reqwest",
  "serde",

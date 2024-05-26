@@ -7,25 +7,8 @@ use chrono;
 use chrono::{Datelike, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json;
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Company {
-    name: String,
-    cik: usize,
-    form_numbers: String,
-    date: String,
-    file_name: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ProcessedCompany {
-    cik: usize,
-    company_aliases: Vec<String>,
-    website: Option<String>,
-    career_page: Option<String>
-    // ticker: Option<String> // probably not necessary
-}
-
+use company_data_store::CompanyDataStore;
+use company_common::{Company, ProcessedCompany};
 
 /// This function gets the date of the company.idx file
 /// The relevant part of the header for this file is 2lines long, and contains:
@@ -47,9 +30,8 @@ pub fn get_idx_file_date() -> Result<chrono::NaiveDate, Box<dyn std::error::Erro
     let date = date[1];
     // remove whitespace
     let date = date.trim();
-    let test = "May 25, 2024";
     println!("{}", date);
-    let date = chrono::NaiveDate::parse_from_str(test, "%B %d, %Y");
+    let date = chrono::NaiveDate::parse_from_str(date, "%B %d, %Y");
     return match date {
         Ok(date) => Ok(date),
         Err(e) => {
@@ -79,13 +61,13 @@ pub fn get_companies_from_idx() -> Result<Vec<Company>, Box<dyn std::error::Erro
         let date = &line[86..98].trim();
         let file_name = &line[98..].trim();
 
-        let company = Company {
-            name: company_name.to_string(),
-            cik: cik.parse::<usize>().unwrap(),
-            form_numbers: form_numbers.to_string(),
-            date: date.to_string(),
-            file_name: file_name.to_string(),
-        };
+        let company = Company::new(
+            company_name.to_string(),
+            cik.parse::<usize>().unwrap(),
+            form_numbers.to_string(),
+            date.to_string(),
+            file_name.to_string(),
+        );
         // dbg!(company);
         all_companies.push(company);
     }
@@ -121,18 +103,23 @@ pub fn separate_and_save_companies(companies: Vec<Company>, partitions: usize, d
     Ok(())
 }
 
-pub fn process_raw_data(companies: Vec<Company>) -> Vec<ProcessedCompany> {
-    let data_store = CompanyDataStore::new();
+pub fn process_raw_data(companies: Vec<Company>){
+    let mut data_store = CompanyDataStore::new();
     for company in companies {
-        let processed_company = ProcessedCompany {
-            cik: company.cik,
-            company_aliases: vec![company.name],
-            website: None,
-            career_page: None
-        };
-        processed_companies.push(processed_company);
+        if data_store.contains(company.cik) {
+            data_store.add_alias(company.cik, company.name);
+            continue;
+        }
+
+        let processed_company = ProcessedCompany::new(
+            company.cik,
+            vec![company.name],
+            None,
+            None,
+        );
+
+        data_store.add_company(processed_company);
     }
-    processed_companies
 }
 
 pub fn save_companies_to_json(companies: Vec<Company>, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -152,7 +139,7 @@ pub async fn get_company_idx_file_from_sec() -> Result<(), Box<dyn std::error::E
         let date = get_idx_file_date()?;
         let now = Utc::now();
         // compare day/month/year
-        if date.day() == now.day() && date.month() == now.month() && date.year() == now.year() {
+        if date.year() == now.year() {
             println!("File is up to date");
             return Ok(());
         }
