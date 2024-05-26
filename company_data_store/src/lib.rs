@@ -17,7 +17,7 @@ pub struct CompanyDataStore {
 impl CompanyDataStore {
     pub fn new() -> CompanyDataStore {
         // check @data_store directory for currently existing data
-        if std::path::Path::new("@data_store").exists() {
+        if !std::path::Path::new("@data_store").exists() {
             // create the directory
             std::fs::create_dir("@data_store").unwrap();
         }
@@ -62,6 +62,12 @@ impl CompanyDataStore {
         }
     }
 
+    pub fn save_data(&self) {
+        let json = serde_json::to_string_pretty(&self).unwrap();
+        let mut file = std::fs::File::create("@data_store/data.json").unwrap();
+        file.write_all(json.as_bytes()).unwrap();
+    }
+
     /// Partitions the full company list into `partition` partitions and saves them into jsons.
     /// This function will also construct a json index from CIKs to their respective json file.
     pub fn separate_and_save_companies(companies: Vec<ProcessedCompany>, partitions: usize, dir: &str)
@@ -94,16 +100,51 @@ impl CompanyDataStore {
         Ok(())
     }
 
+    pub fn get_companies(&self) -> Vec<ProcessedCompany> {
+        self.data_map.values().cloned().collect()
+    }
+
+    pub fn replace_data(&mut self, companies: &Vec<ProcessedCompany>) {
+        self.data_map.clear();
+        for company in companies {
+            self.data_map.insert(company.cik, company.clone());
+        }
+        self.update_stats(companies);
+    }
+
+    pub fn update_stats(&mut self, companies: &Vec<ProcessedCompany>) {
+        self.total_entries = companies.len();
+        self.career_pages_unassigned = {
+            let mut count = 0;
+            for company in companies {
+                if company.career_page.is_none() {
+                    count += 1;
+                }
+            }
+            count
+        };
+        self.websites_unassigned = {
+            let mut count = 0;
+            for company in companies {
+                if company.website.is_none() {
+                    count += 1;
+                }
+            }
+            count
+        };
+    }
+
     /// stores the company data into some kind of storage, to later be stored in persistent storage
-    pub fn add_company(&mut self, company: ProcessedCompany) {
+    pub fn add_company(&mut self, company: ProcessedCompany, company_name: String) {
         // we've got a couple options here; in the interest of simplicity and our use case,
         // we really only ever have at most 200,000 entries, so it's unlikely
         // we'll run into any memory issues, but it might be worth considering
         // doing some kind of paging, which might add some complexity to the code.
         // I'll probably just stick to the serialized hashmap until I feel like I need to change it.
+
         if self.contains(company.cik) {
-            // we've already got this company, so we'll just add the alias
-            self.add_alias(company.cik, company.company_aliases[0].clone());
+            // if the cik already exists, we can add the name as an alias
+            self.add_alias(company.cik, company_name);
             return;
         }
         self.data_map.insert(company.cik, company);

@@ -4,7 +4,7 @@
 Repository for my little job search (and apply?) program/bot
 
 ## Plans/Requirements
-- [ ] How do I locate company names?
+- [x] How do I locate company names?
 - [ ] How do I locate company websites?
 - [ ] How do I locate company career pages?
 - [ ] How do I distinguish different job postings/navigate to them?

@@ -14,8 +14,8 @@ pub struct Company {
 pub struct ProcessedCompany {
     pub cik: usize,
     pub company_aliases: HashSet<String>,
-    website: Option<String>,
-    career_page: Option<String>
+    pub website: Option<String>,
+    pub career_page: Option<String>
     // ticker: Option<String> // probably not necessary
 }
 

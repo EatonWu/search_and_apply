@@ -89,10 +89,27 @@ pub fn process_raw_data(companies: Vec<Company>) -> CompanyDataStore {
             None,
             None,
         );
-        processed_company.company_aliases.insert(company.name);
-        data_store.add_company(processed_company);
+        processed_company.company_aliases.insert(company.name.clone());
+        data_store.add_company(processed_company, company.name);
     }
     data_store
+}
+
+/// This function filters the data based on the filter strings.
+/// Returns a vector of ProcessedCompany structs that contain the filter strings.
+/// Could have used a regex here, but the filter strings are simple enough that it's not necessary.
+pub fn filter_data(data_store: &CompanyDataStore, filter: Vec<&str>) -> Vec<ProcessedCompany> {
+    let mut filtered_data = vec![];
+    // convert all filter strings to lowercase
+    let filter: Vec<String> = filter.iter().map(|&x| x.to_lowercase()).collect();
+    for company in data_store.get_companies() {
+        if filter.iter().any(|filter|
+            company.company_aliases.iter().any(|alias|
+                alias.to_lowercase().contains(filter.as_str()))) {
+            filtered_data.push(company.clone());
+        }
+    }
+    filtered_data
 }
 
 // This function downloads the master list of companies from the SEC
