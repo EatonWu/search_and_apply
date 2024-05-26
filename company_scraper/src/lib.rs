@@ -5,7 +5,6 @@ use std::io::{BufRead, Write};
 use reqwest::header;
 use chrono;
 use chrono::{Datelike, Utc};
-use serde::{Deserialize, Serialize};
 use serde_json;
 use company_data_store::CompanyDataStore;
 use company_common::{Company, ProcessedCompany};
@@ -24,6 +23,8 @@ pub fn get_idx_file_date() -> Result<chrono::NaiveDate, Box<dyn std::error::Erro
     // get the second line
     if let Some(Ok(line)) = lines.next() {
         date = line;
+    } else {
+        return Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, "No second line")));
     }
     // string is now of the format "Last Data Received: MONTH DD, YYYY", parse out into datetime
     let date = date.split(": ").collect::<Vec<&str>>();
@@ -54,7 +55,8 @@ pub fn get_companies_from_idx() -> Result<Vec<Company>, Box<dyn std::error::Erro
     // parse out the company names and the CIK numbers, which we'll use as hash keys.
     for line in lines {
         let line = line?;
-        // company names are at most 60 characters long, but the first column seems to be 63 characters long
+        // company names are at most 60 characters long,
+        // but the first column length seems to be fixed length
         let company_name = &line[0..62].trim();
         let form_numbers = &line[62..74].trim();
         let cik = &line[74..86].trim();
@@ -74,36 +76,9 @@ pub fn get_companies_from_idx() -> Result<Vec<Company>, Box<dyn std::error::Erro
     Ok(all_companies)
 }
 
-fn add_partition_to_index(companies: &[Company], current_index: usize, index_map: &mut HashMap<usize, usize>) {
-    for company in companies {
-        index_map.insert(company.cik, current_index);
-    }
-}
 
-/// Partitions the full company list into `partition` partitions and saves them into jsons.
-/// This function will also construct a json index from CIKs to their respective json file.
-pub fn separate_and_save_companies(companies: Vec<Company>, partitions: usize, dir: &str)
-                                                        -> Result<(), Box<dyn std::error::Error>> {
-    let partition_size = companies.len() / partitions;
-    let mut index = HashMap::new();
-    for i in 0..partitions {
-        let start = i * partition_size;
-        let end = if i == partitions - 1 {
-            companies.len()
-        } else {
-            (i + 1) * partition_size
-        };
-        let partition = &companies[start..end];
 
-        add_partition_to_index(partition, i, &mut index);
-
-        let filename = format!("{}/companies_{}.json", dir, i);
-        save_companies_to_json(partition.to_vec(), &filename)?;
-    }
-    Ok(())
-}
-
-pub fn process_raw_data(companies: Vec<Company>){
+pub fn process_raw_data(companies: Vec<Company>) -> CompanyDataStore {
     let mut data_store = CompanyDataStore::new();
     for company in companies {
         if data_store.contains(company.cik) {
@@ -117,18 +92,12 @@ pub fn process_raw_data(companies: Vec<Company>){
             None,
             None,
         );
-
         data_store.add_company(processed_company);
     }
+    data_store
 }
 
-pub fn save_companies_to_json(companies: Vec<Company>, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
-    // save companies pretty printed
-    let json = serde_json::to_string_pretty(&companies)?;
-    let mut file = std::fs::File::create(filename)?;
-    file.write_all(json.as_bytes())?;
-    Ok(())
-}
+
 
 // This function downloads the master list of companies from the SEC
 pub async fn get_company_idx_file_from_sec() -> Result<(), Box<dyn std::error::Error>>{

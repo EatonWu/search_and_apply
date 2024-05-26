@@ -11,7 +11,7 @@ pub struct Company {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ProcessedCompany {
-    cik: usize,
+    pub cik: usize,
     pub company_aliases: Vec<String>,
     website: Option<String>,
     career_page: Option<String>

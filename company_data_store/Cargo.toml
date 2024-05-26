@@ -3,3 +3,4 @@ name = "company_data_store"
 
 [dependencies]
 company_common = { path = "../company_common" }
+serde_json = "1.0.117"
