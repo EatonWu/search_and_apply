@@ -1,6 +1,7 @@
 # Purpose
+Gets a list of companies.
+
 This is probably the harder problem crate to develop.
-(One step at a time!)
 ## How do we locate some list of companies?
 
 Possible data sources include (kinda want to focus on US companies for now):
@@ -13,14 +14,5 @@ Possible data sources include (kinda want to focus on US companies for now):
 
 Captchas might be a concern.
 
-I have decide
-
-## How do we find the company websites?
-
-## How do we find the company career pages?
-
-# Design
-
 TBW
-```
-```
+
