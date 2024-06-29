@@ -11,7 +11,8 @@ pub struct CompanyDataStore {
     total_entries: usize,
     websites_unassigned: usize,
     career_pages_unassigned: usize,
-    data_map: HashMap<usize, ProcessedCompany> // CID to ProcessedCompany entry
+    key_list: Vec<usize>, // list of keys to maintain order
+    data_map: HashMap<usize, ProcessedCompany> // CIK to ProcessedCompany entry
 }
 
 impl CompanyDataStore {
@@ -34,6 +35,7 @@ impl CompanyDataStore {
                         websites_unassigned: 0,
                         career_pages_unassigned: 0,
                         data_map: HashMap::new(),
+                        key_list: vec![],
                     };
                 }
             };
@@ -53,6 +55,7 @@ impl CompanyDataStore {
             websites_unassigned: 0,
             career_pages_unassigned: 0,
             data_map: HashMap::new(),
+            key_list: vec![],
         }
     }
 
@@ -62,10 +65,27 @@ impl CompanyDataStore {
         }
     }
 
+    pub fn get_key_iter(&self) -> impl Iterator<Item=&usize> {
+        self.key_list.iter()
+    }
+
+    pub fn get_key_iter_mut(&mut self) -> impl Iterator<Item=&mut usize> {
+        self.key_list.iter_mut()
+    }
+
+    pub fn to_iter(&self) -> impl Iterator<Item = (&usize, &ProcessedCompany)> {
+        let key_list_iter = self.get_key_iter();
+        key_list_iter.map(move |key| (key, self.data_map.get(key).unwrap()))
+    }
+
     pub fn save_data(&self) {
         let json = serde_json::to_string_pretty(&self).unwrap();
         let mut file = std::fs::File::create("@data_store/data.json").unwrap();
         file.write_all(json.as_bytes()).unwrap();
+    }
+
+    pub fn get_entry(&self, key: &usize) -> Option<&ProcessedCompany>{
+        self.data_map.get(&key)
     }
 
     /// Partitions the full company list into `partition` partitions and saves them into jsons.
@@ -106,8 +126,10 @@ impl CompanyDataStore {
 
     pub fn replace_data(&mut self, companies: &Vec<ProcessedCompany>) {
         self.data_map.clear();
+        self.key_list.clear();
         for company in companies {
             self.data_map.insert(company.cik, company.clone());
+            self.key_list.push(company.cik);
         }
         self.update_stats(companies);
     }
@@ -126,7 +148,7 @@ impl CompanyDataStore {
         self.websites_unassigned = {
             let mut count = 0;
             for company in companies {
-                if company.website.is_none() {
+                if company.websites.is_none() {
                     count += 1;
                 }
             }
@@ -147,7 +169,9 @@ impl CompanyDataStore {
             self.add_alias(company.cik, company_name);
             return;
         }
-        self.data_map.insert(company.cik, company);
+        let cik = company.cik.clone();
+        self.data_map.insert(cik, company);
+        self.key_list.push(cik);
         self.total_entries += 1;
     }
 

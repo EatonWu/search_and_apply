@@ -2,7 +2,7 @@
 members = [ "company_common",
     "company_data_store",
     "company_scraper",
-    "job_applier", "website_discovery",
+    "job_applier", "sa_postgres_interface", "website_discovery",
 ]
 
 [package]

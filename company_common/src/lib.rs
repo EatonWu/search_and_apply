@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Company {
     pub name: String,
@@ -11,11 +10,16 @@ pub struct Company {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[diesel(table_name = "processed_companies")]
+#[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct ProcessedCompany {
     pub cik: usize,
     pub company_aliases: HashSet<String>,
-    pub website: Option<String>,
-    pub career_page: Option<String>
+    pub websites: Option<Vec<String>>,
+    pub career_page: Option<String>,
+    pub tags: Option<Vec<String>>,
+    pub has_captcha: Option<bool>,
+
     // ticker: Option<String> // probably not necessary
 }
 
@@ -29,16 +33,17 @@ impl Company {
             file_name
         }
     }
-
 }
 
 impl ProcessedCompany {
-    pub fn new(cik: usize, company_aliases: HashSet<String>, website: Option<String>, career_page: Option<String>) -> ProcessedCompany {
+    pub fn new(cik: usize, company_aliases: HashSet<String>, websites: Option<Vec<String>>, career_page: Option<String>) -> ProcessedCompany {
         ProcessedCompany {
             cik,
             company_aliases,
-            website,
-            career_page
+            websites,
+            career_page,
+            tags: None,
+            has_captcha: None
         }
     }
 }
