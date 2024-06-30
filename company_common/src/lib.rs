@@ -19,7 +19,6 @@ pub struct ProcessedCompany {
     pub career_page: Option<String>,
     pub tags: Option<Vec<String>>,
     pub has_captcha: Option<bool>,
-
     // ticker: Option<String> // probably not necessary
 }
 
@@ -36,14 +35,19 @@ impl Company {
 }
 
 impl ProcessedCompany {
-    pub fn new(cik: usize, company_aliases: HashSet<String>, websites: Option<Vec<String>>, career_page: Option<String>) -> ProcessedCompany {
+    pub fn new(cik: usize,
+               company_aliases: HashSet<String>,
+               websites: Option<Vec<String>>,
+               career_page: Option<String>,
+    tags: Option<Vec<String>>,
+    has_captcha: Option<bool>) -> ProcessedCompany {
         ProcessedCompany {
             cik,
             company_aliases,
             websites,
             career_page,
-            tags: None,
-            has_captcha: None
+            tags,
+            has_captcha,
         }
     }
 }

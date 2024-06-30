@@ -12,4 +12,13 @@ pub fn establish_connection() ->  Result<Client, Box<dyn Error>>{
     Ok(client)
 }
 
+/// Create a table in the database with the given name and attributes,
+/// Should never be called by users
+/// Vulnerable to SQL injection?
+pub fn create_table(client: &mut Client, table_name: &str, attributes: &str) -> Result<(), Box<dyn Error>> {
+    let query = format!("CREATE TABLE {} ({})", table_name, attributes);
+    client.execute(&query, &[])?;
+    Ok(())
+}
+
 // pub fn get_
