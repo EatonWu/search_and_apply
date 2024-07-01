@@ -36,3 +36,16 @@ CompanyCareerPage
 ---
 * sid: integer primary key
 * career_page_link: varchar(255)
+
+
+# SQL Queries
+
+## Get all companies with a specific tag
+```sql
+SELECT CompanyTable.sid
+FROM CompanyTable
+JOIN CompanyTags
+ON CompanyTable.sid = CompanyTags.sid
+WHERE CompanyTags.tag = '$1'; // parameterized
+```
+

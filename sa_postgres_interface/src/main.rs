@@ -1,4 +1,4 @@
-use sa_postgres_interface::{create_table, establish_connection};
+use sa_postgres_interface::{create_table, establish_connection, initialize_database};
 
 pub fn main() {
     let mut client = establish_connection();
@@ -13,14 +13,14 @@ pub fn main() {
         }
     }
     let mut client = client.unwrap();
-    let res = create_table(&mut client, "processed_companies", "");
+    let dry_run = false;
+    let res = initialize_database(&mut client, dry_run);
     match res {
         Ok(_) => {
-            println!("Table created successfully");
+            println!("Database initialized");
         },
         Err(e) => {
             println!("Error: {:?}", e);
         }
     }
-
 }
