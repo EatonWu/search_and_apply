@@ -1,26 +1,79 @@
 use company_scraper;
 use company_scraper::get_company_idx_file_from_sec;
+use futures::executor::block_on;
+use company_data_store::CompanyDataStore;
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>>{
-    get_company_idx_file_from_sec().await?;
-    let companies = company_scraper::get_companies_from_idx()?;
+fn main() {
+    // use executor to block on this get_company_idx_file_from_sec function
+    let thing = block_on(get_company_idx_file_from_sec());
+    match thing {
+        Ok(_) => {
+            println!("Successfully extracted data from sec file");
+        },
+        Err(e) => {
+            println!("Error: {:?}", e);
+            return;
+        }
+    }
 
-    let mut data_store = company_scraper::process_raw_data(companies);
+    let companies = company_scraper::get_companies_from_idx();
+    let mut good_data_store;
+    let dry_run = false;
+    // match companies {
+    //     Ok(companies) => {
+    //         println!("Successfully extracted companies from idx file");
+    //         let data_store = company_scraper::process_raw_sec_data(companies, dry_run);
+    //         match data_store {
+    //             Ok(store) => {
+    //                 good_data_store = store;
+    //                 println!("Successfully processed raw data");
+    //             },
+    //             Err(e) => {
+    //                 println!("Error: {:?}", e);
+    //                 return;
+    //             }
+    //         };
+    //     },
+    //     Err(e) => {
+    //         println!("Error: {:?}", e);
+    //         return;
+    //     }
+    // }
+    good_data_store = CompanyDataStore::new();
+    let mut good_data_store = match good_data_store {
+        Ok(store) => {
+            println!("Connected to database");
+            store
+        },
+        Err(e) => {
+            println!("Error: {:?}", e);
+            return;
+        }
+    };
+
+    // remove all companies that don't have an alias
     let filter = vec! [
         "inc",
         "corp",
         "llc",
         "ltd",
-        "group"
+        "group",
+        "lp",
+        "l.p",
+        "l.l.c",
+        "co",
+        "l p",
+        "company",
+        "bank"
     ];
-    let filtered_companies = company_scraper::filter_data(&data_store, filter);
-    data_store.replace_data(&filtered_companies);
-    for company in &filtered_companies {
-        println!("{:?}", company);
+    let res = good_data_store.filter_companies_alias(filter);
+    match res {
+        Ok(_) => {
+            println!("Successfully filtered data");
+        },
+        Err(e) => {
+            println!("Error: {:?}", e);
+            return;
+        }
     }
-    println!("Total companies: {}", &filtered_companies.len());
-    data_store.save_data();
-    data_store.print_stats();
-    Ok(())
 }

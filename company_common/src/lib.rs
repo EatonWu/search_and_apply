@@ -3,17 +3,15 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Company {
     pub name: String,
-    pub cik: usize,
+    pub cik: Option<i32>,
     form_numbers: String,
     date: String,
     file_name: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[diesel(table_name = "processed_companies")]
-#[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct ProcessedCompany {
-    pub cik: usize,
+    pub cik: Option<i32>,
     pub company_aliases: HashSet<String>,
     pub websites: Option<Vec<String>>,
     pub career_page: Option<String>,
@@ -23,7 +21,7 @@ pub struct ProcessedCompany {
 }
 
 impl Company {
-    pub fn new(name: String, cik: usize, form_numbers: String, date: String, file_name: String) -> Company {
+    pub fn new(name: String, cik: Option<i32>, form_numbers: String, date: String, file_name: String) -> Company {
         Company {
             name,
             cik,
@@ -35,7 +33,7 @@ impl Company {
 }
 
 impl ProcessedCompany {
-    pub fn new(cik: usize,
+    pub fn new(cik: Option<i32>,
                company_aliases: HashSet<String>,
                websites: Option<Vec<String>>,
                career_page: Option<String>,

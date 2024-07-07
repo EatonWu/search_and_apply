@@ -2,7 +2,7 @@
 members = [ "company_common",
     "company_data_store",
     "company_scraper",
-    "job_applier", "sa_postgres_interface", "website_discovery",
+    "job_applier", "website_discovery",
 ]
 
 [package]
@@ -13,3 +13,4 @@ edition = "2021"
 company_data_store = { path = "company_data_store" }
 company_scraper = { path = "company_scraper" }
 job_applier = { path = "job_applier" }
+postgres = "0.19.7"

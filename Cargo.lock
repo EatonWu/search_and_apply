@@ -165,6 +165,8 @@ name = "company_data_store"
 version = "0.0.0"
 dependencies = [
  "company_common",
+ "dotenvy",
+ "postgres",
  "serde",
  "serde_json",
 ]
@@ -176,6 +178,7 @@ dependencies = [
  "chrono",
  "company_common",
  "company_data_store",
+ "futures",
  "reqwest",
  "serde",
  "serde_json",
@@ -1329,14 +1332,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
 
 [[package]]
-name = "sa_postgres_interface"
-version = "0.1.0"
-dependencies = [
- "dotenvy",
- "postgres",
-]
-
-[[package]]
 name = "schannel"
 version = "0.1.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1374,6 +1369,7 @@ dependencies = [
  "company_data_store",
  "company_scraper",
  "job_applier",
+ "postgres",
 ]
 
 [[package]]

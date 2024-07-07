@@ -1,8 +1,0 @@
-[package]
-name = "sa_postgres_interface"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-dotenvy = "0.15.7"
-postgres = "0.19.7"

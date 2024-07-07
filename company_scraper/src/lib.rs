@@ -1,6 +1,7 @@
 // A good start would probably be just to iterate over all the companies
 
 use std::collections::{HashMap, HashSet};
+use std::error::Error;
 use std::io::{BufRead, Write};
 use reqwest::header;
 use chrono;
@@ -13,7 +14,7 @@ use company_common::{Company, ProcessedCompany};
 /// The relevant part of the header for this file is 2lines long, and contains:
 /// Description
 /// Last Data Received
-pub fn get_idx_file_date() -> Result<chrono::NaiveDate, Box<dyn std::error::Error>> {
+pub fn get_idx_file_date() -> Result<chrono::NaiveDate, Box<dyn Error>> {
     let file = std::fs::File::open("@unprocessed_data/company.idx")?;
     let reader = std::io::BufReader::new(file);
     let mut lines = reader.lines();
@@ -42,7 +43,7 @@ pub fn get_idx_file_date() -> Result<chrono::NaiveDate, Box<dyn std::error::Erro
     };
 }
 
-pub fn get_companies_from_idx() -> Result<Vec<Company>, Box<dyn std::error::Error>> {
+pub fn get_companies_from_idx() -> Result<Vec<Company>, Box<dyn Error>> {
     let file = std::fs::File::open("@unprocessed_data/company.idx")?;
     let reader = std::io::BufReader::new(file);
     let mut lines = reader.lines();
@@ -65,7 +66,7 @@ pub fn get_companies_from_idx() -> Result<Vec<Company>, Box<dyn std::error::Erro
 
         let company = Company::new(
             company_name.to_string(),
-            cik.parse::<usize>().unwrap(),
+            Some(cik.parse::<i32>().unwrap()),
             form_numbers.to_string(),
             date.to_string(),
             file_name.to_string(),
@@ -76,40 +77,61 @@ pub fn get_companies_from_idx() -> Result<Vec<Company>, Box<dyn std::error::Erro
     Ok(all_companies)
 }
 
-pub fn process_raw_data(companies: Vec<Company>) -> CompanyDataStore {
-    let mut data_store = CompanyDataStore::new();
+pub fn process_raw_sec_data(companies: Vec<Company>, dry_run: bool) -> Result<CompanyDataStore, Box<dyn Error>> {
+    let mut data_store = CompanyDataStore::new()?;
     for company in companies {
-        if data_store.contains(company.cik) {
-            data_store.add_alias(company.cik, company.name);
+        let cik = match company.cik {
+            Some(cik) => cik,
+            None => {
+                println!("Company {} has no CIK?, skipping", company.name);
+                continue;
+            }
+        };
+        println!("Processing company: {}", company.name);
+        // check if cik already exists, if so, add the alias
+        if let Some(sid) = data_store.cik_exists(&cik)? {
+            println!("Company with CIK {} already exists, adding alias", company.cik.unwrap());
+            let result = data_store.add_alias(&sid, &company.name, dry_run);
+            match result {
+                Ok(_) => {
+                    println!("Successfully added alias");
+                },
+                Err(e) => {
+                    println!("Error: {:?}", e);
+                }
+            }
             continue;
         }
+        // cik does not already exist, so initialize company
         let mut processed_company = ProcessedCompany::new(
             company.cik,
             HashSet::new(),
             None,
             None,
+            None,
+            None,
         );
         processed_company.company_aliases.insert(company.name.clone());
-        data_store.add_company(processed_company, company.name);
+        data_store.add_company(processed_company, dry_run)?;
     }
-    data_store
+    Ok(data_store)
 }
 
 /// This function filters the data based on the filter strings.
 /// Returns a vector of ProcessedCompany structs that contain the filter strings.
 /// Could have used a regex here, but the filter strings are simple enough that it's not necessary.
-pub fn filter_data(data_store: &CompanyDataStore, filter: Vec<&str>) -> Vec<ProcessedCompany> {
+pub fn filter_data(data_store: &mut CompanyDataStore, filter: Vec<&str>) -> Result<Vec<ProcessedCompany>, Box<dyn Error>> {
     let mut filtered_data = vec![];
     // convert all filter strings to lowercase
     let filter: Vec<String> = filter.iter().map(|&x| x.to_lowercase()).collect();
-    for company in data_store.get_companies() {
+    for company in data_store.get_companies()? {
         if filter.iter().any(|filter|
             company.company_aliases.iter().any(|alias|
                 alias.to_lowercase().contains(filter.as_str()))) {
             filtered_data.push(company.clone());
         }
     }
-    filtered_data
+    Ok(filtered_data)
 }
 
 // This function downloads the master list of companies from the SEC

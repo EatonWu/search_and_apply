@@ -9,3 +9,4 @@ serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0.117"
 company_data_store = { path = "../company_data_store" }
 company_common = { path = "../company_common" }
+futures = "0.3.30"
