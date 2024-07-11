@@ -164,6 +164,7 @@ dependencies = [
 name = "company_data_store"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "company_common",
  "dotenvy",
  "postgres",
@@ -1913,6 +1914,7 @@ dependencies = [
 name = "website_discovery"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "chrono",
  "company_data_store",
  "dotenv",
