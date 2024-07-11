@@ -4,6 +4,15 @@ use serde_json::Value;
 use yup_oauth2 as oauth2;
 use yup_oauth2::{InstalledFlowAuthenticator, InstalledFlowReturnMethod};
 use company_data_store::{CompanyDataStore};
+
+pub struct WebsiteDiscoverer {
+    pub company_data_store: CompanyDataStore,
+}
+
+impl WebsiteDiscoverer {
+
+}
+
 async fn _search_query(query: &str) -> Result<Vec<(String, String)>, Box<dyn Error>> {
     let mut result_vec: Vec<(String, String)> = vec![]; // Tuples containing titles and links
     // deserialize the applicationsecret from serde_json

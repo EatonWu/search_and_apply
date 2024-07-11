@@ -51,25 +51,38 @@ fn main() {
         }
     };
 
-    // remove all companies that don't have an alias
-    let filter = vec! [
-        "inc",
-        "corp",
-        "llc",
-        "ltd",
-        "group",
-        "lp",
-        "l.p",
-        "l.l.c",
-        "co",
-        "l p",
-        "company",
-        "bank"
-    ];
-    let res = good_data_store.filter_companies_alias(filter);
-    match res {
-        Ok(_) => {
-            println!("Successfully filtered data");
+    // // remove all companies that don't have an alias
+    // let filter = vec! [
+    //     "inc",
+    //     "corp",
+    //     "llc",
+    //     "ltd",
+    //     "group",
+    //     "lp",
+    //     "l.p",
+    //     "l.l.c",
+    //     "co",
+    //     "l p",
+    //     "company",
+    //     "bank"
+    // ];
+    // let res = good_data_store.filter_companies_alias(filter);
+    // match res {
+    //     Ok(_) => {
+    //         println!("Successfully filtered data");
+    //     },
+    //     Err(e) => {
+    //         println!("Error: {:?}", e);
+    //         return;
+    //     }
+    // }
+
+    let apple_cik = 320193;
+    let processed_company = good_data_store.get_company_by_cik(apple_cik);
+    match processed_company {
+        Ok(company) => {
+            println!("Successfully retrieved company by CIK");
+            println!("{:?}", company);
         },
         Err(e) => {
             println!("Error: {:?}", e);

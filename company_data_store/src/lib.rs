@@ -194,9 +194,29 @@ impl CompanyDataStore {
     /// websites yet. (Actually, we're not even going to add rows to their respective tables.
     /// A query on a company's websites will return 0 rows if the company has no websites, ideally.
     pub fn add_company(&mut self, company: ProcessedCompany, dry_run: bool) -> Result<(), Box<dyn Error>> {
-        // first, we create a company in the CompanyTable; the table is Serial, so no parameters
-        let sid = self.initialize_company( dry_run)?;
-        println!("Company with sid {} initialized", sid);
+        // check if the company already exists
+        // TODO: Figure out some way to do this if there are different identifiers (CIK, ticker, etc.)
+        let sid = match company.cik {
+            Some(cik) => {
+                self.cik_exists(&cik)?
+            }
+            None => {
+                None
+            }
+        };
+
+        let sid = match sid {
+            Some(sid) => {
+                if company.cik.is_some() {
+                    println!("Company with CIK {} already exists.", company.cik.unwrap());
+                }
+                sid
+            },
+            None => {
+                // if we can't initialize the company, then add_company fails.
+                self.initialize_company(dry_run)?
+            }
+        };
 
         match company.cik {
             Some(cik) => {
@@ -329,6 +349,8 @@ impl CompanyDataStore {
         Ok(Some(tags))
     }
 
+    /// Checks if a company with the given CIK exists
+    /// Returns the sid of the company if it exists
     pub fn cik_exists(&mut self, cik: &i32) -> Result<Option<i32>, Box<dyn Error>> {
         let query = "SELECT * FROM CikToSid WHERE cik = $1 LIMIT 1".to_string();
         let results = self.postgres_client.query(&query, &[&cik])?;
@@ -395,6 +417,19 @@ impl CompanyDataStore {
         let query = format!("SELECT * FROM {} WHERE cik = $1 LIMIT 1", CompanyTables::CikToSid.as_str());
         let res = self.postgres_client.query(&query, &[&cik])?;
         Ok(res.len() > 0)
+    }
+
+    pub fn get_company_by_cik(&mut self, cik: i32) -> Result<ProcessedCompany, Box<dyn Error>> {
+        let sid = self.get_sid_from_cik(&cik)?;
+        match sid {
+            Some(sid) => {
+                self.construct_processed_company_from_sid(&sid)
+            },
+            None => {
+                println!("Company with CIK {} not found", cik);
+                Err(Box::from("Could not find company with CIK"))
+            }
+        }
     }
 
     pub fn print_stats(&self) {
