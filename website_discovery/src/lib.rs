@@ -1,19 +1,23 @@
-use std::error::Error;
 use hyper_rustls::{HttpsConnectorBuilder};
 use serde_json::Value;
 use yup_oauth2 as oauth2;
 use yup_oauth2::{InstalledFlowAuthenticator, InstalledFlowReturnMethod};
 use company_data_store::{CompanyDataStore};
-
+use anyhow::Error;
 pub struct WebsiteDiscoverer {
     pub company_data_store: CompanyDataStore,
 }
 
 impl WebsiteDiscoverer {
-
+    pub fn new() -> Result<WebsiteDiscoverer, Error> {
+        let company_data_store = CompanyDataStore::new()?;
+        Ok(WebsiteDiscoverer {
+            company_data_store,
+        })
+    }
 }
 
-async fn _search_query(query: &str) -> Result<Vec<(String, String)>, Box<dyn Error>> {
+async fn _search_query(query: &str) -> Result<Vec<(String, String)>,  Error> {
     let mut result_vec: Vec<(String, String)> = vec![]; // Tuples containing titles and links
     // deserialize the applicationsecret from serde_json
     let secret_file_path = "website_discovery/assets/google_api_key"; // the JSON obtained from Google Cloud Console
@@ -84,7 +88,7 @@ async fn _search_query(query: &str) -> Result<Vec<(String, String)>, Box<dyn Err
     Ok(result_vec)
 }
 
-pub async fn search_query(query: &str) -> Result<Vec<(String, String)>, Box<dyn Error>> {
+pub async fn search_query(query: &str) -> Result<Vec<(String, String)>, Error> {
     let maximum_backoff = 64;
     let mut backoff = 1;
     let res = _search_query(query).await;
@@ -127,7 +131,7 @@ fn construct_query(query: &str) -> String {
     return_string
 }
 
-pub async fn discover_websites_from_data_store() -> Result<(), Box<dyn Error>> {
+pub async fn discover_websites_from_data_store() -> Result<(), Error> {
     let mut data_store = CompanyDataStore::new();
     let mut urls = vec![];
     for key in data_store.get_key_iter() {

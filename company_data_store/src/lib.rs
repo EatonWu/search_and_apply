@@ -1,11 +1,12 @@
 extern crate company_common;
 extern crate serde;
 extern crate postgres;
+extern crate anyhow;
 
 use std::env;
 use company_common::{ProcessedCompany};
 use postgres::*;
-use std::error::Error;
+use anyhow::{bail, Error};
 use std::collections::HashSet;
 
 pub enum CompanyTables {
@@ -69,7 +70,7 @@ impl CompanyTables {
     }
 }
 
-pub fn establish_connection() ->  Result<Client, Box<dyn Error>>{
+pub fn establish_connection() ->  Result<Client, Error>{
     dotenvy::dotenv()?;
     let database_url = env::var("DATABASE_URL")?;
     let client = Client::connect(
@@ -84,7 +85,7 @@ pub struct CompanyDataStore {
 }
 
 impl CompanyDataStore {
-    pub fn new() -> Result<CompanyDataStore, Box<dyn Error>> {
+    pub fn new() -> Result<CompanyDataStore, Error> {
         let client = establish_connection()?;
         let mut data_store = CompanyDataStore {
             postgres_client: client,
@@ -93,7 +94,7 @@ impl CompanyDataStore {
         Ok(data_store)
     }
 
-    pub fn get_companies(&mut self) -> Result<Vec<ProcessedCompany>, Box<dyn Error>> {
+    pub fn get_companies(&mut self) -> Result<Vec<ProcessedCompany>, Error> {
         let query = "SELECT sid FROM CompanyTable".to_string();
         let results = self.postgres_client.query(&query, &[])?;
         let mut companies = Vec::new();
@@ -109,7 +110,7 @@ impl CompanyDataStore {
     /// Create all the tables necessary for the company data
     /// @param client: the postgres client
     /// @param dry_run: if true, will print the queries instead of executing them
-    pub fn initialize_database(&mut self, dry_run: bool) -> Result<(), Box<dyn Error>> {
+    pub fn initialize_database(&mut self, dry_run: bool) -> Result<(), Error> {
         let tables = vec![
             CompanyTables::CompanyTable,
             CompanyTables::CikToSid,
@@ -132,7 +133,7 @@ impl CompanyDataStore {
         Ok(())
     }
 
-    pub fn insert_into_table(&mut self, table: CompanyTables, values: Vec<&(dyn types::ToSql + Sync)>, dry_run: bool) -> Result<(), Box<dyn Error>> {
+    pub fn insert_into_table(&mut self, table: CompanyTables, values: Vec<&(dyn types::ToSql + Sync)>, dry_run: bool) -> Result<(), Error> {
         let query = format!("INSERT INTO {} VALUES ({})", table.as_str(), values.iter().enumerate().map(|(i, _)| format!("${}", i + 1)).collect::<Vec<String>>().join(", "));
         // println!("{}", query);
         self.postgres_client.execute(&query, &values.to_vec())?;
@@ -140,7 +141,7 @@ impl CompanyDataStore {
     }
 
     /// Perform a delete operation on the company with the given sid.
-    pub fn delete_company(&mut self, sid: &i32, dry_run: bool) -> Result<(), Box<dyn Error>> {
+    pub fn delete_company(&mut self, sid: &i32, dry_run: bool) -> Result<(), Error> {
         let query = "DELETE FROM CompanyTable WHERE sid = $1".to_string();
         if dry_run {
             println!("{}", query);
@@ -153,7 +154,7 @@ impl CompanyDataStore {
 
     /// Creates an entry into the CompanyTable, which is a serial value.
     /// Returns the sid of the newly created company
-    pub fn initialize_company(&mut self, dry_run: bool) -> Result<i32, Box<dyn Error>> {
+    pub fn initialize_company(&mut self, dry_run: bool) -> Result<i32, Error> {
         let query = "INSERT INTO CompanyTable DEFAULT VALUES".to_string();
         if dry_run {
             println!("{}", query);
@@ -175,7 +176,7 @@ impl CompanyDataStore {
     /// @param table_name: the name of the table to create
     /// @param attributes: the attributes of the table
     /// @param dry_run: if true, will print the queries instead of executing them
-    pub fn create_table(&mut self, table_name: &str, attributes: &str, dry_run: bool) -> Result<(), Box<dyn Error>> {
+    pub fn create_table(&mut self, table_name: &str, attributes: &str, dry_run: bool) -> Result<(), Error> {
         let query = format!("CREATE TABLE IF NOT EXISTS {} ({})", table_name, attributes);
         if dry_run {
             println!("{}", query);
@@ -193,7 +194,7 @@ impl CompanyDataStore {
     /// Many of these are nullable, seeing as we haven't established the company's tags and
     /// websites yet. (Actually, we're not even going to add rows to their respective tables.
     /// A query on a company's websites will return 0 rows if the company has no websites, ideally.
-    pub fn add_company(&mut self, company: ProcessedCompany, dry_run: bool) -> Result<(), Box<dyn Error>> {
+    pub fn add_company(&mut self, company: ProcessedCompany, dry_run: bool) -> Result<(), Error> {
         // check if the company already exists
         // TODO: Figure out some way to do this if there are different identifiers (CIK, ticker, etc.)
         let sid = match company.cik {
@@ -264,34 +265,34 @@ impl CompanyDataStore {
         Ok(())
     }
 
-    pub fn add_cik(&mut self, cik: i32, sid: i32, dry_run: bool) -> Result<(), Box<dyn Error>> {
+    pub fn add_cik(&mut self, cik: i32, sid: i32, dry_run: bool) -> Result<(), Error> {
         self.insert_into_table(CompanyTables::CikToSid, vec![&cik, &sid], dry_run)
     }
 
-    pub fn add_tag(&mut self, sid: &i32, tag: String, dry_run: bool) -> Result<(), Box<dyn Error>> {
+    pub fn add_tag(&mut self, sid: &i32, tag: String, dry_run: bool) -> Result<(), Error> {
         self.insert_into_table(CompanyTables::CompanyTags, vec![sid, &tag], dry_run)
     }
 
-    pub fn add_alias(&mut self, sid: &i32, alias: &String, dry_run: bool) -> Result<(), Box<dyn Error>>{
+    pub fn add_alias(&mut self, sid: &i32, alias: &String, dry_run: bool) -> Result<(), Error>{
         self.insert_into_table(CompanyTables::CompanyAliases, vec![&alias, sid], dry_run)
     }
 
-    pub fn add_website(&mut self, sid: &i32, website: String, has_captcha: bool, dry_run: bool) -> Result<(), Box<dyn Error>> {
+    pub fn add_website(&mut self, sid: &i32, website: String, has_captcha: bool, dry_run: bool) -> Result<(), Error> {
         self.insert_into_table(CompanyTables::CompanyWebsites, vec![sid, &website, &has_captcha], dry_run)
     }
 
-    pub fn update_captcha_status(&mut self, sid: &i32, website: String, has_captcha: bool) -> Result<(), Box<dyn Error>> {
+    pub fn update_captcha_status(&mut self, sid: &i32, website: String, has_captcha: bool) -> Result<(), Error> {
         let query = "UPDATE CompanyWebsites SET has_captcha = $1 WHERE sid = $2 AND website_link = $3".to_string();
         self.postgres_client.execute(&query, &[&has_captcha, &sid, &website])?;
         Ok(())
     }
 
-    pub fn add_career_page(&mut self, sid: &i32, career_page: &String, dry_run: bool) -> Result<(), Box<dyn Error>> {
+    pub fn add_career_page(&mut self, sid: &i32, career_page: &String, dry_run: bool) -> Result<(), Error> {
         self.insert_into_table(CompanyTables::CompanyCareerPage, vec![sid, &career_page], dry_run)
     }
 
     /// Deletes all companies with aliases that DON'T contain any of the strings in the filter
-    pub fn filter_companies_alias(&mut self, filter: Vec<&str>) -> Result<(), Box<dyn Error>> {
+    pub fn filter_companies_alias(&mut self, filter: Vec<&str>) -> Result<(), Error> {
         let query = "SELECT * FROM CompanyAliases WHERE {}".to_string();
         // create regex pattern that matches on any of the strings using ors
         let filters = filter.iter().map(|x| format!("CompanyAlias NOT ILIKE '%{}%'", x)).collect::<Vec<String>>().join(" AND ");
@@ -307,7 +308,7 @@ impl CompanyDataStore {
         Ok(())
     }
 
-    pub fn construct_processed_company_from_sid(&mut self, sid: &i32) -> Result<ProcessedCompany, Box<dyn Error>> {
+    pub fn construct_processed_company_from_sid(&mut self, sid: &i32) -> Result<ProcessedCompany, Error> {
         let cik = self.get_cik_from_sid(sid)?;
         let aliases = self.get_aliases_from_sid(sid)?;
         let tags = self.get_tags_from_sid(sid)?;
@@ -317,7 +318,7 @@ impl CompanyDataStore {
         Ok(ProcessedCompany::new(cik, aliases, websites, career_page, tags, has_captcha))
     }
 
-    pub fn get_cik_from_sid(&mut self, sid: &i32) -> Result<Option<i32>, Box<dyn Error>> {
+    pub fn get_cik_from_sid(&mut self, sid: &i32) -> Result<Option<i32>, Error> {
         let query = "SELECT cik FROM CikToSid WHERE sid = $1".to_string();
         let results = self.postgres_client.query(&query, &[&sid])?;
         if results.len() == 0 {
@@ -326,7 +327,7 @@ impl CompanyDataStore {
         Ok(Some(results[0].get(0)))
     }
 
-    pub fn get_aliases_from_sid(&mut self, sid: &i32) -> Result<HashSet<String>, Box<dyn Error>> {
+    pub fn get_aliases_from_sid(&mut self, sid: &i32) -> Result<HashSet<String>, Error> {
         let query = "SELECT CompanyAlias FROM CompanyAliases WHERE sid = $1".to_string();
         let results = self.postgres_client.query(&query, &[&sid])?;
         let mut aliases = HashSet::new();
@@ -336,7 +337,7 @@ impl CompanyDataStore {
         Ok(aliases)
     }
 
-    pub fn get_tags_from_sid(&mut self, sid: &i32) -> Result<Option<Vec<String>>, Box<dyn Error>> {
+    pub fn get_tags_from_sid(&mut self, sid: &i32) -> Result<Option<Vec<String>>, Error> {
         let query = "SELECT tag FROM CompanyTags WHERE sid = $1".to_string();
         let results = self.postgres_client.query(&query, &[&sid])?;
         let mut tags = Vec::new();
@@ -351,7 +352,7 @@ impl CompanyDataStore {
 
     /// Checks if a company with the given CIK exists
     /// Returns the sid of the company if it exists
-    pub fn cik_exists(&mut self, cik: &i32) -> Result<Option<i32>, Box<dyn Error>> {
+    pub fn cik_exists(&mut self, cik: &i32) -> Result<Option<i32>, Error> {
         let query = "SELECT * FROM CikToSid WHERE cik = $1 LIMIT 1".to_string();
         let results = self.postgres_client.query(&query, &[&cik])?;
         let sid = match results.len() {
@@ -361,7 +362,7 @@ impl CompanyDataStore {
         Ok(sid)
     }
 
-    pub fn get_websites_from_sid(&mut self, sid: &i32) -> Result<Option<Vec<String>>, Box<dyn Error>> {
+    pub fn get_websites_from_sid(&mut self, sid: &i32) -> Result<Option<Vec<String>>, Error> {
         let query = "SELECT website_link FROM CompanyWebsites WHERE sid = $1".to_string();
         let results = self.postgres_client.query(&query, &[&sid])?;
         let mut websites = Vec::new();
@@ -374,7 +375,7 @@ impl CompanyDataStore {
         Ok(Some(websites))
     }
 
-    pub fn get_career_page_from_sid(&mut self, sid: &i32) -> Result<Option<String>, Box<dyn Error>> {
+    pub fn get_career_page_from_sid(&mut self, sid: &i32) -> Result<Option<String>, Error> {
         let query = "SELECT career_page_link FROM CompanyCareerPage WHERE sid = $1".to_string();
         let results = self.postgres_client.query(&query, &[&sid])?;
         if results.len() == 0 {
@@ -383,7 +384,7 @@ impl CompanyDataStore {
         Ok(Some(results[0].get(0)))
     }
 
-    pub fn get_captcha_status_from_sid(&mut self, sid: &i32) -> Result<Option<bool>, Box<dyn Error>> {
+    pub fn get_captcha_status_from_sid(&mut self, sid: &i32) -> Result<Option<bool>, Error> {
         let query = "SELECT has_captcha FROM CompanyWebsites WHERE sid = $1".to_string();
         let results = self.postgres_client.query(&query, &[&sid])?;
         if results.len() == 0 {
@@ -392,7 +393,7 @@ impl CompanyDataStore {
         Ok(Some(results[0].get(0)))
     }
 
-    pub fn get_sid_from_cik(&mut self, cik: &i32) -> Result<Option<i32>, Box<dyn Error>> {
+    pub fn get_sid_from_cik(&mut self, cik: &i32) -> Result<Option<i32>, Error> {
         let query = "SELECT sid FROM CikToSid WHERE cik = $1".to_string();
         let results = self.postgres_client.query(&query, &[&cik])?;
         if results.len() == 0 {
@@ -401,7 +402,7 @@ impl CompanyDataStore {
         Ok(Some(results[0].get(0)))
     }
 
-    pub fn get_sid_from_alias(&mut self, alias: &str) -> Result<Option<i32>, Box<dyn Error>> {
+    pub fn get_sid_from_alias(&mut self, alias: &str) -> Result<Option<i32>, Error> {
         let query = "SELECT sid FROM CompanyAliases WHERE CompanyAlias = $1".to_string();
         let results = self.postgres_client.query(&query, &[&alias])?;
         if results.len() == 0 {
@@ -412,14 +413,14 @@ impl CompanyDataStore {
 
 
     /// Checks if some company already exists (might not need)
-    pub fn contains_cik(&mut self, cik: i32) -> Result<bool, Box<dyn Error>>{
+    pub fn contains_cik(&mut self, cik: i32) -> Result<bool, Error>{
         // get single row
         let query = format!("SELECT * FROM {} WHERE cik = $1 LIMIT 1", CompanyTables::CikToSid.as_str());
         let res = self.postgres_client.query(&query, &[&cik])?;
         Ok(res.len() > 0)
     }
 
-    pub fn get_company_by_cik(&mut self, cik: i32) -> Result<ProcessedCompany, Box<dyn Error>> {
+    pub fn get_company_by_cik(&mut self, cik: i32) -> Result<ProcessedCompany, Error> {
         let sid = self.get_sid_from_cik(&cik)?;
         match sid {
             Some(sid) => {
@@ -427,7 +428,7 @@ impl CompanyDataStore {
             },
             None => {
                 println!("Company with CIK {} not found", cik);
-                Err(Box::from("Could not find company with CIK"))
+                bail!("Could not find company with CIK")
             }
         }
     }
