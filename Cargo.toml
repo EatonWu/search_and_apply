@@ -2,7 +2,7 @@
 members = [ "company_common",
     "company_data_store",
     "company_scraper",
-    "job_applier", "website_discovery",
+    "job_applier", "serp_service", "website_discovery",
 ]
 
 [package]
