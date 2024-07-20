@@ -3,7 +3,7 @@ use serde_json::Value;
 use yup_oauth2 as oauth2;
 use yup_oauth2::{InstalledFlowAuthenticator, InstalledFlowReturnMethod};
 use company_data_store::{CompanyDataStore};
-use anyhow::Error;
+use anyhow::{bail, Error};
 pub struct WebsiteDiscoverer {
     pub company_data_store: CompanyDataStore,
 }
@@ -32,5 +32,5 @@ fn construct_query(query: &str) -> String {
 }
 
 pub async fn discover_websites_from_data_store() -> Result<(), Error> {
-
+    bail!("Not implemented");
 }
