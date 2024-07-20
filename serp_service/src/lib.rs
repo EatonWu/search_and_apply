@@ -4,22 +4,33 @@ use yup_oauth2 as oauth2;
 use yup_oauth2::{InstalledFlowAuthenticator, InstalledFlowReturnMethod};
 use company_data_store::{CompanyDataStore};
 use anyhow::{Error, bail};
+use futures::executor::block_on;
 
-trait SerpService {
-    fn get_serp(&self, query: &str) -> Result<(String, String), Error>;
+pub trait SerpService {
+    fn get_serp(&self, query: &str) -> Result<Vec<(String, String)>, Error>;
 }
 
+// ------------------------------------------------------------------------------------------------
+// Google Stuff
 pub struct GoogleSerpService {
     secret_file_path: String,
     cse_id: String,
 }
 
 impl SerpService for GoogleSerpService {
-    async fn get_serp(&self, query: &str) -> Result<Vec<(String, String)>, Error> {
+    fn get_serp(&self, query: &str) -> Result<Vec<(String, String)>, Error> {
         let mut result_vec: Vec<(String, String)> = vec![]; // Tuples containing titles and links
         // deserialize the applicationsecret from serde_json
         let secret_file_path = &self.secret_file_path; // the JSON obtained from Google Cloud Console
-        let secret = oauth2::read_application_secret(secret_file_path).await?;
+        let secret = block_on(oauth2::read_application_secret(secret_file_path));
+        let secret = match secret {
+            Ok(secret) => {
+                secret
+            },
+            Err(e) => {
+                bail!("Error: {:?}, file_path: {:?}", e, secret_file_path);
+            }
+        };
         let scopes = &["https://www.googleapis.com/auth/cse"];
 
         // honestly i have no idea what this does
@@ -34,11 +45,11 @@ impl SerpService for GoogleSerpService {
             secret,
             InstalledFlowReturnMethod::HTTPRedirect,
             client.clone(),
-        ).persist_tokens_to_disk("website_discovery/assets/tokencache.json") // SOME LOCATION TO STORE YOUR TOKEN
-            .build()
-            .await?;
+        ).persist_tokens_to_disk("assets/tokencache.json") // SOME LOCATION TO STORE YOUR TOKEN
+            .build();
+        let auth = block_on(auth)?;
 
-        let token = auth.token(scopes).await?;
+        let token = block_on(auth.token(scopes))?;
         // println!("Token: {:?}", &token);
 
         // Obtained via creating a custom search engine
@@ -53,7 +64,7 @@ impl SerpService for GoogleSerpService {
             },
             None => {
                 // println!("Token is None");
-                return Err("Token is None".into());
+                bail!("Token is None");
             }
         }
 
@@ -64,15 +75,17 @@ impl SerpService for GoogleSerpService {
             .get("https://www.googleapis.com/customsearch/v1")
             .bearer_auth(final_token)
             .query(&query)
-            .send().await?;
+            .send();
+        let client = block_on(client)?;
 
         match client.status() {
             reqwest::StatusCode::OK => {},
             _ => {
-                return Err("Error: Status code is not OK".into());
+                bail!("Error: Status code is not OK");
             }
         }
-        let response = client.text().await?;
+        let response = client.text();
+        let response = block_on(response)?;
 
         let jsoned_response: Value = serde_json::from_str(&response)?;
         jsoned_response.get("items").unwrap().as_array().unwrap().iter().for_each(|item| {
@@ -88,9 +101,57 @@ impl SerpService for GoogleSerpService {
 
 impl GoogleSerpService {
     pub fn new(secret_file: Option<String>) -> Self {
-        GoogleSerpService {
-            secret_file_path: secret_file.unwrap_or("website_discovery/assets/google_api_key".to_string()),
-            cse_id: "4352d533b0a554434".to_string(),
+        if secret_file.is_none() {
+            GoogleSerpService { // we expect assets directory to be in the highest level
+                secret_file_path: secret_file.unwrap_or("assets/google_api_key".to_string()),
+                cse_id: "4352d533b0a554434".to_string(),
+            }
+        }
+        else {
+            GoogleSerpService {
+                secret_file_path: secret_file.unwrap(),
+                cse_id: "4352d533b0a554434".to_string(),
+            }
+        }
+    }
+
+    pub async fn search_query(&mut self, query: &str) -> Result<Vec<(String, String)>, Error> {
+        let maximum_backoff = 64;
+        let mut backoff = 1;
+        loop {
+            let res = self.get_serp(query);
+            match res {
+                Ok(v) => {
+                    return Ok(v);
+                },
+                Err(e) => {
+                    println!("Error: {:?}", e);
+                    if backoff > maximum_backoff {
+                        bail!("Backoff limit reached");
+                    }
+                    println!("Retrying in {} seconds", backoff);
+                    std::thread::sleep(std::time::Duration::from_secs(backoff));
+                    backoff *= 2;
+                }
+            }
         }
     }
 }
+
+// ------------------------------------------------------------------------------------------------
+// Bing Stuff
+
+pub struct BingSerpService {
+    secret_file_path: String,
+    cse_id: String,
+}
+
+// ------------------------------------------------------------------------------------------------
+// DuckDuckGo Stuff
+
+pub struct DuckDuckGoSerpService {
+    secret_file_path: String,
+    cse_id: String,
+}
+
+
