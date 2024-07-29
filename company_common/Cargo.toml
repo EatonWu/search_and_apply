@@ -5,3 +5,4 @@ edition = "2021"
 
 [dependencies]
 serde = "1.0.203"
+anyhow = "1.0.86"

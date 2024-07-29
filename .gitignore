@@ -8,3 +8,4 @@
 /@data_store/
 /website_discovery/assets/google_api_key
 /.env
+/assets/google_api_key

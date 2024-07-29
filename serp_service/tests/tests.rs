@@ -3,6 +3,7 @@ mod tests {
     use futures::executor::block_on;
     use serp_service::*;
     use super::*;
+    use duckduckgo_search::DuckDuckGoSearch;
 
     #[tokio::test]
     async fn test_get_search_results() {
@@ -28,5 +29,24 @@ mod tests {
         //         assert!(false)
         //     }
         // }
+    }
+
+    #[tokio::test]
+    async fn ddg_get_search_results() {
+        let query = "test";
+        let ddg_search = DuckDuckGoSearch::new();
+        let res = ddg_search.search(query).await;
+        match res {
+            Ok(v) => {
+                for (title, url) in v {
+                    println!("Title: {}, URL: {}", title, url);
+                }
+            },
+            Err(e) => {
+                println!("Error: {:?}", e);
+                assert!(false)
+            }
+        }
+
     }
 }

@@ -6,9 +6,6 @@ use company_data_store::{CompanyDataStore};
 use anyhow::{Error, bail};
 use futures::executor::block_on;
 
-pub trait SerpService {
-    fn get_serp(&self, query: &str) -> Result<Vec<(String, String)>, Error>;
-}
 
 // ------------------------------------------------------------------------------------------------
 // Google Stuff
@@ -17,12 +14,12 @@ pub struct GoogleSerpService {
     cse_id: String,
 }
 
-impl SerpService for GoogleSerpService {
-    fn get_serp(&self, query: &str) -> Result<Vec<(String, String)>, Error> {
+impl GoogleSerpService {
+    async fn get_serp(&self, query: &str) -> Result<Vec<(String, String)>, Error> {
         let mut result_vec: Vec<(String, String)> = vec![]; // Tuples containing titles and links
         // deserialize the applicationsecret from serde_json
         let secret_file_path = &self.secret_file_path; // the JSON obtained from Google Cloud Console
-        let secret = block_on(oauth2::read_application_secret(secret_file_path));
+        let secret = oauth2::read_application_secret(secret_file_path).await;
         let secret = match secret {
             Ok(secret) => {
                 secret
@@ -47,9 +44,9 @@ impl SerpService for GoogleSerpService {
             client.clone(),
         ).persist_tokens_to_disk("assets/tokencache.json") // SOME LOCATION TO STORE YOUR TOKEN
             .build();
-        let auth = block_on(auth)?;
+        let auth = auth.await?;
 
-        let token = block_on(auth.token(scopes))?;
+        let token = auth.token(scopes).await?;
         // println!("Token: {:?}", &token);
 
         // Obtained via creating a custom search engine
@@ -76,7 +73,7 @@ impl SerpService for GoogleSerpService {
             .bearer_auth(final_token)
             .query(&query)
             .send();
-        let client = block_on(client)?;
+        let client = client.await?;
 
         match client.status() {
             reqwest::StatusCode::OK => {},
@@ -85,14 +82,14 @@ impl SerpService for GoogleSerpService {
             }
         }
         let response = client.text();
-        let response = block_on(response)?;
+        let response = response.await?;
 
         let jsoned_response: Value = serde_json::from_str(&response)?;
         jsoned_response.get("items").unwrap().as_array().unwrap().iter().for_each(|item| {
             let title = item.get("title").unwrap().as_str().unwrap();
             let link = item.get("link").unwrap().as_str().unwrap();
-            // println!("Title: {}", title);
-            // println!("Link: {}", link);
+            println!("Title: {}", title);
+            println!("Link: {}", link);
             result_vec.push((title.to_string(), link.to_string()));
         });
         Ok(result_vec)
@@ -101,6 +98,7 @@ impl SerpService for GoogleSerpService {
 
 impl GoogleSerpService {
     pub fn new(secret_file: Option<String>) -> Self {
+        println!("Instantiating GoogleSerpService");
         if secret_file.is_none() {
             GoogleSerpService { // we expect assets directory to be in the highest level
                 secret_file_path: secret_file.unwrap_or("assets/google_api_key".to_string()),
@@ -116,10 +114,11 @@ impl GoogleSerpService {
     }
 
     pub async fn search_query(&mut self, query: &str) -> Result<Vec<(String, String)>, Error> {
+        println!("Searching query: {}", query);
         let maximum_backoff = 64;
         let mut backoff = 1;
         loop {
-            let res = self.get_serp(query);
+            let res = self.get_serp(query).await;
             match res {
                 Ok(v) => {
                     return Ok(v);
@@ -150,8 +149,13 @@ pub struct BingSerpService {
 // DuckDuckGo Stuff
 
 pub struct DuckDuckGoSerpService {
-    secret_file_path: String,
-    cse_id: String,
+
+}
+
+impl DuckDuckGoSerpService {
+    fn get_serp(&self, query: &str) -> Result<Vec<(String, String)>, Error> {
+        unimplemented!()
+    }
 }
 
 

@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
+use anyhow::{bail, Error};
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Company {
     pub name: String,
@@ -46,6 +48,13 @@ impl ProcessedCompany {
             career_page,
             tags,
             has_captcha,
+        }
+    }
+
+    pub fn get_company_name(&self) -> Result<String, Error> {
+        match self.company_aliases.iter().next() {
+            Some(name) => Ok(name.clone()),
+            None => bail!("No company name found"),
         }
     }
 }
