@@ -15,7 +15,7 @@ pub struct Company {
 pub struct ProcessedCompany {
     pub cik: Option<i32>,
     pub company_aliases: HashSet<String>,
-    pub websites: Option<Vec<String>>,
+    pub websites: Option<Vec<(String, String)>>,
     pub career_page: Option<String>,
     pub tags: Option<Vec<String>>,
     pub has_captcha: Option<bool>,
@@ -37,7 +37,7 @@ impl Company {
 impl ProcessedCompany {
     pub fn new(cik: Option<i32>,
                company_aliases: HashSet<String>,
-               websites: Option<Vec<String>>,
+               websites: Option<Vec<(String, String)>>,
                career_page: Option<String>,
     tags: Option<Vec<String>>,
     has_captcha: Option<bool>) -> ProcessedCompany {

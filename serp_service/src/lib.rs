@@ -3,8 +3,26 @@ use serde_json::Value;
 use yup_oauth2 as oauth2;
 use yup_oauth2::{InstalledFlowAuthenticator, InstalledFlowReturnMethod};
 use company_data_store::{CompanyDataStore};
-use anyhow::{Error, bail};
+use anyhow::{Error, bail, Result};
 use futures::executor::block_on;
+use thiserror::Error;
+
+
+#[derive(Error, Debug)]
+pub enum SerpServiceError {
+    #[error("Status code: {status_code}")]
+    StatusError {status_code: u16},
+    #[error("Failed to parse JSON")]
+    JsonFailedError,
+    #[error("Failed to get token")]
+    TokenRetrievalError,
+    #[error("Authentication error")]
+    AuthError,
+    #[error("HTTP Client build error")]
+    HttpClientBuildError,
+    #[error("HTTP Request error")]
+    HttpRequestError,
+}
 
 
 // ------------------------------------------------------------------------------------------------
@@ -15,7 +33,7 @@ pub struct GoogleSerpService {
 }
 
 impl GoogleSerpService {
-    async fn get_serp(&self, query: &str) -> Result<Vec<(String, String)>, Error> {
+    async fn get_serp(&self, query: &str) -> Result<Vec<(String, String)>, SerpServiceError> {
         let mut result_vec: Vec<(String, String)> = vec![]; // Tuples containing titles and links
         // deserialize the applicationsecret from serde_json
         let secret_file_path = &self.secret_file_path; // the JSON obtained from Google Cloud Console
@@ -25,7 +43,7 @@ impl GoogleSerpService {
                 secret
             },
             Err(e) => {
-                bail!("Error: {:?}, file_path: {:?}", e, secret_file_path);
+                return Err(SerpServiceError::TokenRetrievalError);
             }
         };
         let scopes = &["https://www.googleapis.com/auth/cse"];
@@ -44,9 +62,23 @@ impl GoogleSerpService {
             client.clone(),
         ).persist_tokens_to_disk("assets/tokencache.json") // SOME LOCATION TO STORE YOUR TOKEN
             .build();
-        let auth = auth.await?;
+        let auth = auth.await;
+        let auth = match auth {
+            Ok(auth) => {auth},
+            Err(_) => {
+                return Err(SerpServiceError::TokenRetrievalError);
+            }
+        };
 
-        let token = auth.token(scopes).await?;
+        let token = auth.token(scopes).await;
+        let token = match token {
+            Ok(token) => {
+                token
+            },
+            Err(_) => {
+                return Err(SerpServiceError::AuthError);
+            }
+        };
         // println!("Token: {:?}", &token);
 
         // Obtained via creating a custom search engine
@@ -61,33 +93,106 @@ impl GoogleSerpService {
             },
             None => {
                 // println!("Token is None");
-                bail!("Token is None");
+                return Err(SerpServiceError::TokenRetrievalError);
             }
         }
 
         let query = vec![("q", query), ("cx", &self.cse_id)];
 
         // Construct a HTTP client with a http authorization header
-        let client = reqwest::Client::builder().build()?
-            .get("https://www.googleapis.com/customsearch/v1")
+        let client = reqwest::Client::builder().build();
+        let client = match client {
+            Ok(client) => {
+                client
+            },
+            Err(_) => {
+                return Err(SerpServiceError::HttpClientBuildError);
+            }
+        };
+
+        let client = client.get("https://www.googleapis.com/customsearch/v1")
             .bearer_auth(final_token)
             .query(&query)
             .send();
-        let client = client.await?;
+        let client = client.await;
+
+        let client = match client {
+            Ok(client) => {
+                client
+            },
+            Err(_) => {
+                return Err(SerpServiceError::HttpRequestError);
+            }
+        };
 
         match client.status() {
             reqwest::StatusCode::OK => {},
             _ => {
-                bail!("Error: Status code is not OK");
+                return Err(SerpServiceError::StatusError {status_code: client.status().as_u16()});
             }
         }
         let response = client.text();
-        let response = response.await?;
+        let response = response.await;
+        let response = match response {
+            Ok(response) => {
+                response
+            },
+            Err(_) => {
+                return Err(SerpServiceError::HttpRequestError);
+            }
+        };
 
-        let jsoned_response: Value = serde_json::from_str(&response)?;
-        jsoned_response.get("items").unwrap().as_array().unwrap().iter().for_each(|item| {
-            let title = item.get("title").unwrap().as_str().unwrap();
-            let link = item.get("link").unwrap().as_str().unwrap();
+        let jsoned_response: Value = serde_json::from_str(&response).map_err(|_| SerpServiceError::JsonFailedError)?; // hmmm
+
+        let jsoned_response = match jsoned_response.get("items") {
+            Some(jsoned_response) => {
+                jsoned_response
+            },
+            None => {
+                return Err(SerpServiceError::JsonFailedError);
+            }
+        };
+        let jsoned_response = match jsoned_response.as_array() {
+            Some(jsoned_response) => {
+                jsoned_response
+            },
+            None => {
+                return Err(SerpServiceError::JsonFailedError);
+            }
+        };
+
+
+        jsoned_response.iter().for_each(|item| {
+            let title = item.get("title");
+            let title = match title {
+                Some(title) => {
+                    title
+                },
+                None => {
+                    return;
+                }
+            };
+
+            let title = title.as_str();
+            let title = match title {
+                Some(title) => {
+                    title
+                },
+                None => {
+                    return;
+                }
+            };
+
+            let link = item.get("link");
+            let link = match link {
+                Some(link) => {
+                    link
+                },
+                None => {
+                    return;
+                }
+            };
+            let link = link.as_str().unwrap();
             println!("Title: {}", title);
             println!("Link: {}", link);
             result_vec.push((title.to_string(), link.to_string()));
@@ -113,7 +218,7 @@ impl GoogleSerpService {
         }
     }
 
-    pub async fn search_query(&mut self, query: &str) -> Result<Vec<(String, String)>, Error> {
+    pub async fn search_query(&self, query: &str) -> Result<Vec<(String, String)>, SerpServiceError> {
         println!("Searching query: {}", query);
         let maximum_backoff = 64;
         let mut backoff = 1;
@@ -123,13 +228,16 @@ impl GoogleSerpService {
                 Ok(v) => {
                     return Ok(v);
                 },
+                Err(SerpServiceError::JsonFailedError) => {
+                    return Err(SerpServiceError::JsonFailedError);
+                },
                 Err(e) => {
                     println!("Error: {:?}", e);
                     if backoff > maximum_backoff {
-                        bail!("Backoff limit reached");
+                        SerpServiceError::StatusError {status_code: 429};
                     }
                     println!("Retrying in {} seconds", backoff);
-                    std::thread::sleep(std::time::Duration::from_secs(backoff));
+                    tokio::time::sleep(std::time::Duration::from_secs(backoff)).await;
                     backoff *= 2;
                 }
             }

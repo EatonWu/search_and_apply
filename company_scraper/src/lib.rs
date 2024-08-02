@@ -77,8 +77,8 @@ pub fn get_companies_from_idx() -> Result<Vec<Company>, Box<dyn Error>> {
     Ok(all_companies)
 }
 
-pub fn process_raw_sec_data(companies: Vec<Company>, dry_run: bool) -> Result<CompanyDataStore, Box<dyn Error>> {
-    let mut data_store = CompanyDataStore::new()?;
+pub async fn process_raw_sec_data(companies: Vec<Company>, dry_run: bool) -> Result<CompanyDataStore, Box<dyn Error>> {
+    let mut data_store = CompanyDataStore::new().await?;
     for company in companies {
         let cik = match company.cik {
             Some(cik) => cik,
@@ -89,9 +89,9 @@ pub fn process_raw_sec_data(companies: Vec<Company>, dry_run: bool) -> Result<Co
         };
         println!("Processing company: {}", company.name);
         // check if cik already exists, if so, add the alias
-        if let Some(sid) = data_store.cik_exists(&cik)? {
+        if let Some(sid) = data_store.cik_exists(&cik).await? {
             println!("Company with CIK {} already exists, adding alias", company.cik.unwrap());
-            let result = data_store.add_alias(&sid, &company.name, dry_run);
+            let result = data_store.add_alias(&sid, &company.name, dry_run).await;
             match result {
                 Ok(_) => {
                     println!("Successfully added alias");
@@ -112,7 +112,7 @@ pub fn process_raw_sec_data(companies: Vec<Company>, dry_run: bool) -> Result<Co
             None,
         );
         processed_company.company_aliases.insert(company.name.clone());
-        data_store.add_company(processed_company, dry_run)?;
+        data_store.add_company(processed_company, dry_run).await?;
     }
     Ok(data_store)
 }
@@ -120,11 +120,11 @@ pub fn process_raw_sec_data(companies: Vec<Company>, dry_run: bool) -> Result<Co
 /// This function filters the data based on the filter strings.
 /// Returns a vector of ProcessedCompany structs that contain the filter strings.
 /// Could have used a regex here, but the filter strings are simple enough that it's not necessary.
-pub fn filter_data(data_store: &mut CompanyDataStore, filter: Vec<&str>) -> Result<Vec<ProcessedCompany>, Box<dyn Error>> {
+pub async fn filter_data(data_store: &mut CompanyDataStore, filter: Vec<&str>) -> Result<Vec<ProcessedCompany>, Box<dyn Error>> {
     let mut filtered_data = vec![];
     // convert all filter strings to lowercase
     let filter: Vec<String> = filter.iter().map(|&x| x.to_lowercase()).collect();
-    for company in data_store.get_companies()? {
+    for company in data_store.get_companies().await? {
         if filter.iter().any(|filter|
             company.company_aliases.iter().any(|alias|
                 alias.to_lowercase().contains(filter.as_str()))) {

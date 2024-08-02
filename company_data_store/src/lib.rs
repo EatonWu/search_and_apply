@@ -37,7 +37,7 @@ impl CompanyTables {
                 PRIMARY KEY (sid, tag), FOREIGN KEY (sid) REFERENCES CompanyTable(sid) ON DELETE CASCADE"
             },
             CompanyTables::CompanyWebsites => {
-                "sid INTEGER, website_link VARCHAR(255), has_captcha BOOLEAN, \
+                "sid INTEGER, website_title VARCHAR(512), website_link VARCHAR(512), has_captcha BOOLEAN, \
                 PRIMARY KEY (sid, website_link), FOREIGN KEY (sid) REFERENCES CompanyTable(sid) ON DELETE CASCADE"
             },
             CompanyTables::CompanyCareerPage => {
@@ -256,8 +256,8 @@ impl CompanyDataStore {
             }
         }
         if company.websites.is_some() {
-            for website in company.websites.unwrap() {
-                self.add_website(&sid, website, false, dry_run).await?;
+            for (title, website_link) in company.websites.unwrap() {
+                self.add_website(&sid, &title, &website_link, false, dry_run).await?;
             }
         }
 
@@ -291,8 +291,8 @@ impl CompanyDataStore {
         self.insert_into_table(CompanyTables::CompanyAliases, vec![&alias, sid], dry_run).await
     }
 
-    pub async fn add_website(&mut self, sid: &i32, website: String, has_captcha: bool, dry_run: bool) -> Result<(), Error> {
-        self.insert_into_table(CompanyTables::CompanyWebsites, vec![sid, &website, &has_captcha], dry_run).await
+    pub async fn add_website(&mut self, sid: &i32, title: &String, website: &String, has_captcha: bool, dry_run: bool) -> Result<(), Error> {
+        self.insert_into_table(CompanyTables::CompanyWebsites, vec![sid, title, website, &has_captcha], dry_run).await
     }
 
     pub async fn update_captcha_status(&mut self, sid: &i32, website: String, has_captcha: bool) -> Result<(), Error> {
@@ -322,7 +322,7 @@ impl CompanyDataStore {
         Ok(())
     }
 
-    pub async fn construct_processed_company_from_sid(&mut self, sid: &i32) -> Result<ProcessedCompany, Error> {
+    pub async fn construct_processed_company_from_sid(&self, sid: &i32) -> Result<ProcessedCompany, Error> {
         let cik = self.get_cik_from_sid(sid).await?;
         let aliases = self.get_aliases_from_sid(sid).await?;
         let tags = self.get_tags_from_sid(sid).await?;
@@ -332,7 +332,7 @@ impl CompanyDataStore {
         Ok(ProcessedCompany::new(cik, aliases, websites, career_page, tags, has_captcha))
     }
 
-    pub async fn get_cik_from_sid(&mut self, sid: &i32) -> Result<Option<i32>, Error> {
+    pub async fn get_cik_from_sid(&self, sid: &i32) -> Result<Option<i32>, Error> {
         let query = "SELECT cik FROM CikToSid WHERE sid = $1".to_string();
         let results = self.postgres_client.query(&query, &[&sid]).await?;
         if results.len() == 0 {
@@ -341,7 +341,7 @@ impl CompanyDataStore {
         Ok(Some(results[0].get(0)))
     }
 
-    pub async fn get_aliases_from_sid(&mut self, sid: &i32) -> Result<HashSet<String>, Error> {
+    pub async fn get_aliases_from_sid(&self, sid: &i32) -> Result<HashSet<String>, Error> {
         let query = "SELECT CompanyAlias FROM CompanyAliases WHERE sid = $1".to_string();
         let results = self.postgres_client.query(&query, &[&sid]).await?;
         let mut aliases = HashSet::new();
@@ -351,7 +351,7 @@ impl CompanyDataStore {
         Ok(aliases)
     }
 
-    pub async fn get_tags_from_sid(&mut self, sid: &i32) -> Result<Option<Vec<String>>, Error> {
+    pub async fn get_tags_from_sid(&self, sid: &i32) -> Result<Option<Vec<String>>, Error> {
         let query = "SELECT tag FROM CompanyTags WHERE sid = $1".to_string();
         let results = self.postgres_client.query(&query, &[&sid]).await?;
         let mut tags = Vec::new();
@@ -376,12 +376,12 @@ impl CompanyDataStore {
         Ok(sid)
     }
 
-    pub async fn get_websites_from_sid(&mut self, sid: &i32) -> Result<Option<Vec<String>>, Error> {
-        let query = "SELECT website_link FROM CompanyWebsites WHERE sid = $1".to_string();
+    pub async fn get_websites_from_sid(&self, sid: &i32) -> Result<Option<Vec<(String, String)>>, Error> {
+        let query = "SELECT website_title, website_link FROM CompanyWebsites WHERE sid = $1".to_string();
         let results = self.postgres_client.query(&query, &[&sid]).await?;
         let mut websites = Vec::new();
         for row in results {
-            websites.push(row.get(0));
+            websites.push((row.get(0), row.get(1)));
         }
         if websites.len() == 0 {
             return Ok(None);
@@ -389,7 +389,7 @@ impl CompanyDataStore {
         Ok(Some(websites))
     }
 
-    pub async fn get_career_page_from_sid(&mut self, sid: &i32) -> Result<Option<String>, Error> {
+    pub async fn get_career_page_from_sid(&self, sid: &i32) -> Result<Option<String>, Error> {
         let query = "SELECT career_page_link FROM CompanyCareerPage WHERE sid = $1".to_string();
         let results = self.postgres_client.query(&query, &[&sid]).await?;
         if results.len() == 0 {
@@ -398,7 +398,7 @@ impl CompanyDataStore {
         Ok(Some(results[0].get(0)))
     }
 
-    pub async fn get_captcha_status_from_sid(&mut self, sid: &i32) -> Result<Option<bool>, Error> {
+    pub async fn get_captcha_status_from_sid(&self, sid: &i32) -> Result<Option<bool>, Error> {
         let query = "SELECT has_captcha FROM CompanyWebsites WHERE sid = $1".to_string();
         let results = self.postgres_client.query(&query, &[&sid]).await?;
         if results.len() == 0 {
@@ -447,7 +447,7 @@ impl CompanyDataStore {
         }
     }
 
-    pub async fn get_next_undiscovered_company(&mut self) -> Result<ProcessedCompany, Error> {
+    pub async fn get_next_undiscovered_company(&self) -> Result<(i32, ProcessedCompany), Error> {
         let query = "SELECT sid FROM CompanyTable WHERE sid NOT IN (SELECT sid FROM CompanyWebsites) LIMIT 1".to_string();
         let results = self.postgres_client.query(&query, &[]).await?;
         if results.len() == 0 {
@@ -458,7 +458,7 @@ impl CompanyDataStore {
         let result = self.construct_processed_company_from_sid(&sid).await;
         match result {
             Ok(v) => {
-                Ok(v)
+                Ok((sid, v))
             },
             Err(e) => {
                 println!("Error: {:?}", e);
